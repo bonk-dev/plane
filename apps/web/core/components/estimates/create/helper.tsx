@@ -13,6 +13,9 @@ export const isEstimateSystemEnabled = (key: TEstimateSystemKeys) => {
       return true;
     case EEstimateSystem.CATEGORIES:
       return true;
+    // Custom addition (fork): time estimates enabled in Community
+    case EEstimateSystem.TIME:
+      return true;
     default:
       return false;
   }

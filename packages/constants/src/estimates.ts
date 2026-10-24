@@ -119,6 +119,7 @@ export const ESTIMATE_SYSTEMS: TEstimateSystems = {
     is_available: true,
     is_ee: false,
   },
+  // Custom addition (fork): time estimates enabled in Community. Values are stored in minutes.
   time: {
     name: "Time",
     i18n_name: "project_settings.estimates.systems.time.label",
@@ -127,16 +128,25 @@ export const ESTIMATE_SYSTEMS: TEstimateSystems = {
         title: "Hours",
         i18n_title: "project_settings.estimates.systems.time.hours",
         values: [
-          { id: undefined, key: 1, value: "1" },
-          { id: undefined, key: 2, value: "2" },
-          { id: undefined, key: 3, value: "3" },
-          { id: undefined, key: 4, value: "4" },
-          { id: undefined, key: 5, value: "5" },
-          { id: undefined, key: 6, value: "6" },
+          { id: undefined, key: 1, value: "60" },
+          { id: undefined, key: 2, value: "120" },
+          { id: undefined, key: 3, value: "180" },
+          { id: undefined, key: 4, value: "240" },
+          { id: undefined, key: 5, value: "360" },
+          { id: undefined, key: 6, value: "480" },
         ],
+      },
+      custom: {
+        title: "Custom",
+        i18n_title: "project_settings.estimates.create.custom",
+        values: [
+          { id: undefined, key: 1, value: "60" },
+          { id: undefined, key: 2, value: "120" },
+        ],
+        hide: true,
       },
     },
     is_available: true,
-    is_ee: true,
+    is_ee: false,
   },
 };
