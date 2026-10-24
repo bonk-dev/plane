@@ -13,6 +13,8 @@ from .project import ProjectBaseModel
 class EstimateType(models.TextChoices):
     CATEGORIES = "categories", "Categories"
     POINTS = "points", "Points"
+    # Custom addition (fork): time estimates, values stored in minutes
+    TIME = "time", "Time"
 
 
 class Estimate(ProjectBaseModel):
