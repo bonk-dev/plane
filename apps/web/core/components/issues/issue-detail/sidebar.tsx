@@ -41,6 +41,7 @@ import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/prop
 import { IssueCycleSelect } from "./cycle-select";
 import { IssueLabel } from "./label";
 import { IssueModuleSelect } from "./module-select";
+import { IssueWorkLogProperty } from "./worklog/root";
 import type { TIssueOperations } from "./root";
 
 type Props = {
@@ -202,6 +203,14 @@ export const IssueDetailsSidebar = observer(function IssueDetailsSidebar(props: 
                 />
               </SidebarPropertyListItem>
             )}
+
+            {/* Custom addition (fork): time logged on work items */}
+            <IssueWorkLogProperty
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              issueId={issueId}
+              isEditable={isEditable}
+            />
 
             {projectDetails?.module_view && (
               <SidebarPropertyListItem icon={ModuleIcon} label={t("common.modules")}>

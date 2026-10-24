@@ -30,6 +30,7 @@ import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 import { PriorityDropdown } from "@/components/dropdowns/priority";
 import { StateDropdown } from "@/components/dropdowns/state/dropdown";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
+import { IssueWorkLogProperty } from "@/components/issues/issue-detail/worklog/root";
 // helpers
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
@@ -202,6 +203,14 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
             />
           </SidebarPropertyListItem>
         )}
+
+        {/* Custom addition (fork): time logged on work items */}
+        <IssueWorkLogProperty
+          workspaceSlug={workspaceSlug}
+          projectId={projectId}
+          issueId={issueId}
+          isEditable={!disabled}
+        />
 
         {projectDetails?.module_view && (
           <SidebarPropertyListItem icon={ModuleIcon} label={t("common.modules")}>
