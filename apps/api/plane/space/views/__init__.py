@@ -31,3 +31,6 @@ from .label import ProjectLabelsEndpoint
 from .asset import EntityAssetEndpoint, AssetRestoreEndpoint, EntityBulkAssetEndpoint
 
 from .meta import ProjectMetaDataEndpoint
+
+from .worklog import IssueWorkLogPublicEndpoint
+from .estimate import ProjectEstimatePublicEndpoint

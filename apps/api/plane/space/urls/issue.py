@@ -11,6 +11,7 @@ from plane.space.views import (
     IssueReactionPublicViewSet,
     CommentReactionPublicViewSet,
     IssueVotePublicViewSet,
+    IssueWorkLogPublicEndpoint,
 )
 
 urlpatterns = [
@@ -53,5 +54,11 @@ urlpatterns = [
         "anchor/<str:anchor>/issues/<uuid:issue_id>/votes/",
         IssueVotePublicViewSet.as_view({"get": "list", "post": "create", "delete": "destroy"}),
         name="issue-vote-project-board",
+    ),
+    # Custom addition (fork): time logged on work items
+    path(
+        "anchor/<str:anchor>/issues/<uuid:issue_id>/worklogs/",
+        IssueWorkLogPublicEndpoint.as_view(),
+        name="issue-worklogs-project-board",
     ),
 ]
