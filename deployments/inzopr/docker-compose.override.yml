@@ -1,0 +1,22 @@
+# Custom addition (fork): use the images built from the inzopr branch (.github/workflows/inzopr-images.yml).
+# Goes on top of deployments/cli/community/docker-compose.yml; see README.md in this directory.
+# The remaining services keep makeplane/* images at APP_RELEASE (the upstream base tag, e.g. v1.4.2).
+
+services:
+  web:
+    image: ghcr.io/bonk-dev/plane-frontend:${INZOPR_RELEASE:?set INZOPR_RELEASE in plane.env}
+
+  space:
+    image: ghcr.io/bonk-dev/plane-space:${INZOPR_RELEASE:?set INZOPR_RELEASE in plane.env}
+
+  api:
+    image: ghcr.io/bonk-dev/plane-backend:${INZOPR_RELEASE:?set INZOPR_RELEASE in plane.env}
+
+  worker:
+    image: ghcr.io/bonk-dev/plane-backend:${INZOPR_RELEASE:?set INZOPR_RELEASE in plane.env}
+
+  beat-worker:
+    image: ghcr.io/bonk-dev/plane-backend:${INZOPR_RELEASE:?set INZOPR_RELEASE in plane.env}
+
+  migrator:
+    image: ghcr.io/bonk-dev/plane-backend:${INZOPR_RELEASE:?set INZOPR_RELEASE in plane.env}
