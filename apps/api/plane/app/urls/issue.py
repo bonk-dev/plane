@@ -31,6 +31,8 @@ from plane.app.views import (
     WorkItemDescriptionVersionEndpoint,
     IssueMetaEndpoint,
     IssueDetailIdentifierEndpoint,
+    IssueWorkLogViewSet,
+    ProjectWorkLogEndpoint,
 )
 
 urlpatterns = [
@@ -122,6 +124,22 @@ urlpatterns = [
             }
         ),
         name="project-issue-links",
+    ),
+    # Custom addition (fork): time logged on work items
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/issues/<uuid:issue_id>/worklogs/",
+        IssueWorkLogViewSet.as_view({"get": "list", "post": "create"}),
+        name="project-issue-worklogs",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/issues/<uuid:issue_id>/worklogs/<uuid:pk>/",
+        IssueWorkLogViewSet.as_view({"patch": "partial_update", "delete": "destroy"}),
+        name="project-issue-worklogs",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<uuid:project_id>/worklogs/",
+        ProjectWorkLogEndpoint.as_view(),
+        name="project-worklogs",
     ),
     path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/issues/<uuid:issue_id>/issue-attachments/",
