@@ -10,6 +10,23 @@ import type { IPublicIssue, TIssuePublicComment, TPublicIssuesResponse } from "@
 // api service
 import { APIService } from "../api.service";
 
+/** Custom addition (fork): time entry as shown in a published project */
+export type TPublicIssueWorkLog = {
+  id: string;
+  /** minutes */
+  duration: number;
+  /** YYYY-MM-DD */
+  logged_date: string;
+  description: string;
+  display_name: string;
+};
+
+/** Custom addition (fork): active estimate of a published project (time values are minutes) */
+export type TPublicProjectEstimate = {
+  type: "points" | "categories" | "time" | null;
+  points: { id: string; key: number; value: string }[];
+};
+
 /**
  * Service class for managing issues within plane sites application
  * Extends the APIService class to handle HTTP requests to the issue-related endpoints
@@ -242,6 +259,35 @@ export class SitesIssueService extends APIService {
    */
   async removeCommentReaction(anchor: string, commentId: string, reactionHex: string): Promise<any> {
     return this.delete(`/api/public/anchor/${anchor}/comments/${commentId}/reactions/${reactionHex}/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response;
+      });
+  }
+
+  /**
+   * Custom addition (fork): retrieves the time entries logged on a specific issue
+   * @param {string} anchor - The anchor identifier
+   * @param {string} issueID - The issue identifier
+   * @returns {Promise<TPublicIssueWorkLog[]>} Promise resolving to the time entries
+   * @throws {Error} If the API request fails
+   */
+  async listWorkLogs(anchor: string, issueID: string): Promise<TPublicIssueWorkLog[]> {
+    return this.get(`/api/public/anchor/${anchor}/issues/${issueID}/worklogs/`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response;
+      });
+  }
+
+  /**
+   * Custom addition (fork): retrieves the active estimate of a published project
+   * @param {string} anchor - The anchor identifier
+   * @returns {Promise<TPublicProjectEstimate>} Promise resolving to the estimate type and points
+   * @throws {Error} If the API request fails
+   */
+  async getProjectEstimate(anchor: string): Promise<TPublicProjectEstimate> {
+    return this.get(`/api/public/anchor/${anchor}/estimates/`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response;

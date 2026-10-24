@@ -39,6 +39,8 @@ export const IssuesListLayoutRoot = observer(function IssuesListLayoutRoot(props
       labels: true,
       priority: true,
       due_date: true,
+      // Custom addition (fork): estimates shown in published projects
+      estimate: true,
     }),
     []
   );

@@ -31,6 +31,8 @@ export const IssueKanbanLayoutRoot = observer(function IssueKanbanLayoutRoot(pro
       labels: true,
       priority: true,
       due_date: true,
+      // Custom addition (fork): estimates shown in published projects
+      estimate: true,
     }),
     []
   );

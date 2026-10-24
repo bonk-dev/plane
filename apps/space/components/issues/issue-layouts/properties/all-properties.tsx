@@ -19,6 +19,7 @@ import { getDate } from "@/helpers/date-time.helper";
 import type { IIssue } from "@/types/issue";
 import { IssueBlockCycle } from "./cycle";
 import { IssueBlockDate } from "./due-date";
+import { IssueBlockEstimate } from "./estimate";
 import { IssueBlockLabels } from "./labels";
 import { IssueBlockMembers } from "./member";
 import { IssueBlockModules } from "./modules";
@@ -116,6 +117,14 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
       )}
 
       {/* estimates */}
+      {/* Custom addition (fork): read-only estimate in published projects */}
+      {issue.estimate_point && (
+        <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="estimate">
+          <div className="h-5">
+            <IssueBlockEstimate estimatePointId={issue.estimate_point} />
+          </div>
+        </WithDisplayPropertiesHOC>
+      )}
       {/* {projectId && areEstimateEnabledByProjectId(projectId?.toString()) && (
         <WithDisplayPropertiesHOC displayProperties={displayProperties} displayPropertyKey="estimate">
           <div className="h-5">

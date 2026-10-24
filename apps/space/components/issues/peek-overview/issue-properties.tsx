@@ -14,6 +14,7 @@ import {
   StateGroupIcon,
   PriorityPropertyIcon,
   DueDatePropertyIcon,
+  EstimatePropertyIcon,
   PriorityIcon,
 } from "@plane/propel/icons";
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
@@ -25,8 +26,11 @@ import { copyTextToClipboard, addSpaceIfCamelCase } from "@/helpers/string.helpe
 // hooks
 import { usePublish } from "@/hooks/store/publish";
 import { useStates } from "@/hooks/store/use-state";
+import { usePublicEstimate } from "@/hooks/use-public-estimate";
 // types
 import type { IIssue, IPeekMode } from "@/types/issue";
+// local imports
+import { PeekOverviewIssueWorkLog } from "./issue-worklog";
 
 type Props = {
   issueDetails: IIssue;
@@ -45,6 +49,9 @@ export const PeekOverviewIssueProperties = observer(function PeekOverviewIssuePr
   const { anchor } = useParams();
 
   const { project_details } = usePublish(anchor?.toString());
+  // Custom addition (fork): estimates shown in published projects
+  const { getEstimateLabel } = usePublicEstimate(anchor?.toString());
+  const estimateLabel = getEstimateLabel(issueDetails.estimate_point);
 
   const priority = issueDetails.priority ? getIssuePriorityFilters(issueDetails.priority) : null;
 
@@ -131,6 +138,18 @@ export const PeekOverviewIssueProperties = observer(function PeekOverviewIssuePr
             )}
           </div>
         </div>
+
+        {/* Custom addition (fork): estimates shown in published projects */}
+        <div className="flex h-8 items-center gap-3">
+          <div className="flex w-1/4 flex-shrink-0 items-center gap-1 text-13 text-tertiary">
+            <EstimatePropertyIcon className="size-4 flex-shrink-0" />
+            <span>{t("common.estimate")}</span>
+          </div>
+          <div className="w-3/4 text-13">{estimateLabel ?? <span className="text-secondary">Empty</span>}</div>
+        </div>
+
+        {/* Custom addition (fork): time logged on work items */}
+        {anchor && <PeekOverviewIssueWorkLog anchor={anchor.toString()} issueId={issueDetails.id} />}
       </div>
     </div>
   );
