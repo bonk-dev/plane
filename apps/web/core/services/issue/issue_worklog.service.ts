@@ -30,6 +30,9 @@ export type TIssueWorkLog = {
   updated_at: string;
 };
 
+/** person: person × work item, issue: per work item, member: per person, none: every time entry */
+export type TWorkLogReportGroup = "person" | "issue" | "member";
+
 export type TIssueWorkLogPayload = Pick<TIssueWorkLog, "duration" | "logged_date" | "description">;
 
 export class IssueWorkLogService extends APIService {
@@ -70,9 +73,14 @@ export class IssueWorkLogService extends APIService {
       });
   }
 
-  /** Direct link to the project-wide CSV report (uses the browser session cookie). */
-  static reportCsvUrl(workspaceSlug: string, projectId: string, group?: "issue" | "member") {
-    const params = new URLSearchParams({ export: "csv" });
+  /** Direct link to the project-wide time report file (uses the browser session cookie). */
+  static reportExportUrl(
+    workspaceSlug: string,
+    projectId: string,
+    format: "csv" | "xlsx",
+    group?: TWorkLogReportGroup
+  ) {
+    const params = new URLSearchParams({ export: format });
     if (group) params.set("group", group);
     return `${API_BASE_URL}/api/workspaces/${workspaceSlug}/projects/${projectId}/worklogs/?${params.toString()}`;
   }

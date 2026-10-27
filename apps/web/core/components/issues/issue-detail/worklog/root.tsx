@@ -165,7 +165,7 @@ function WorkLogDialog({
   );
 }
 
-const csvLinkClassName = "text-caption-sm-regular text-secondary underline underline-offset-2 hover:text-primary";
+const reportLinkClassName = "text-caption-sm-regular text-secondary underline underline-offset-2 hover:text-primary";
 
 function WorkLogModal(props: ModalProps) {
   const {
@@ -331,14 +331,29 @@ function WorkLogModal(props: ModalProps) {
           </div>
 
           <div className="flex flex-wrap gap-x-4 gap-y-1">
-            <a className={csvLinkClassName} href={IssueWorkLogService.reportCsvUrl(workspaceSlug, projectId, "issue")}>
-              CSV: estymata vs. czas (projekt)
+            <a
+              className={reportLinkClassName}
+              href={IssueWorkLogService.reportExportUrl(workspaceSlug, projectId, "xlsx", "person")}
+            >
+              Excel: osoba – zadanie – estymata – czas
             </a>
-            <a className={csvLinkClassName} href={IssueWorkLogService.reportCsvUrl(workspaceSlug, projectId, "member")}>
-              CSV: czas per osoba
+            <a
+              className={reportLinkClassName}
+              href={IssueWorkLogService.reportExportUrl(workspaceSlug, projectId, "xlsx", "issue")}
+            >
+              Excel: estymata vs. czas (projekt)
             </a>
-            <a className={csvLinkClassName} href={IssueWorkLogService.reportCsvUrl(workspaceSlug, projectId)}>
-              CSV: wszystkie wpisy
+            <a
+              className={reportLinkClassName}
+              href={IssueWorkLogService.reportExportUrl(workspaceSlug, projectId, "xlsx", "member")}
+            >
+              Excel: czas per osoba
+            </a>
+            <a
+              className={reportLinkClassName}
+              href={IssueWorkLogService.reportExportUrl(workspaceSlug, projectId, "xlsx")}
+            >
+              Excel: wszystkie wpisy
             </a>
           </div>
         </div>

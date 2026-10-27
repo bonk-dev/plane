@@ -27,6 +27,7 @@ import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
 import { CountChip } from "@/components/common/count-chip";
 // constants
 import { HeaderFilters } from "@/components/issues/filters";
+import { WorkLogReportMenu } from "@/components/issues/worklog-report-menu";
 // helpers
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
@@ -117,6 +118,10 @@ export const IssuesHeader = observer(function IssuesHeader() {
             workspaceSlug={workspaceSlug}
             canUserCreateIssue={canUserCreateIssue}
           />
+          {/* Custom addition (fork): time report export */}
+          {workspaceSlug && projectId && (
+            <WorkLogReportMenu workspaceSlug={workspaceSlug.toString()} projectId={projectId.toString()} />
+          )}
         </div>
         {canUserCreateIssue && (
           <Button
