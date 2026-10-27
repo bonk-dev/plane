@@ -4,9 +4,11 @@
 #
 # Custom addition (fork): time logged on work items.
 
+import io
 from uuid import uuid4
 
 import pytest
+from openpyxl import load_workbook
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -15,6 +17,7 @@ from plane.db.models import (
     Estimate,
     EstimatePoint,
     Issue,
+    IssueAssignee,
     IssueWorkLog,
     Project,
     ProjectMember,
@@ -181,6 +184,51 @@ class TestIssueWorkLog:
         assert "Formularz logowania" in body
 
         assert _client(setup["outsider"]).get(report_url(setup)).status_code == status.HTTP_403_FORBIDDEN
+
+    def test_report_per_person_and_work_item(self, setup):
+        member = _client(setup["member"])
+        member.post(issue_url(setup), {"duration": 60}, format="json")
+        member.post(issue_url(setup), {"duration": 30}, format="json")
+        _client(setup["admin"]).post(issue_url(setup), {"duration": 45}, format="json")
+        # estimated, nobody logged time yet -> listed under its assignee
+        planned = Issue.objects.create(
+            name="Raport", project=setup["project"], workspace=setup["ws"], estimate_point=setup["issue"].estimate_point
+        )
+        IssueAssignee.objects.create(
+            issue=planned, assignee=setup["guest"], project=setup["project"], workspace=setup["ws"]
+        )
+
+        resp = _client(setup["member"]).get(report_url(setup))
+        assert resp.status_code == status.HTTP_200_OK
+        assert [(p["display_name"], p["name"], p["estimate"], p["logged_hours"]) for p in resp.data["people"]] == [
+            ("admin", "Formularz logowania", 2.0, 0.75),
+            ("guest", "Raport", 2.0, 0.0),
+            ("member", "Formularz logowania", 2.0, 1.5),
+        ]
+
+        body = member.get(report_url(setup) + "?export=csv&group=person").content.decode("utf-8-sig")
+        assert body.splitlines()[0] == "display_name;identifier;name;estimate;logged_hours"
+
+    def test_report_xlsx(self, setup):
+        _client(setup["member"]).post(issue_url(setup), {"duration": 90, "description": "=1+1"}, format="json")
+
+        resp = _client(setup["member"]).get(report_url(setup) + "?export=xlsx&group=person")
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp["Content-Disposition"] == 'attachment; filename="PRJ-worklogs-person.xlsx"'
+        sheet = load_workbook(io.BytesIO(resp.content)).active
+        assert [c.value for c in sheet[2]] == [
+            "member",
+            f"PRJ-{setup['issue'].sequence_id}",
+            "Formularz logowania",
+            2,
+            1.5,
+        ]
+
+        # cells starting with "=" are not turned into formulas
+        sheet = load_workbook(
+            io.BytesIO(_client(setup["member"]).get(report_url(setup) + "?export=xlsx").content)
+        ).active
+        assert sheet[2][-1].value == "'=1+1"
 
 
 @pytest.mark.contract
