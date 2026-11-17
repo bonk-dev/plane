@@ -6,6 +6,7 @@ ENV PYTHONUNBUFFERED 1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 
 ENV INSTANCE_CHANGELOG_URL https://sites.plane.so/pages/691ef037bcfe416a902e48cb55f59891/
 
+# Custom addition (fork): font-dejavu = Polish characters in the PDF time report
 RUN apk --no-cache add \
     "bash~=5.2" \
     "libpq" \
@@ -21,7 +22,8 @@ RUN apk --no-cache add \
     "make" \
     "postgresql-dev" \
     "libc-dev" \
-    "linux-headers"
+    "linux-headers" \
+    "font-dejavu"
 
 WORKDIR /code
 

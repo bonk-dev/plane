@@ -42,6 +42,8 @@ slack-sdk==3.27.1
 scout-apm==3.5.3
 # xlsx generation
 openpyxl==3.1.2
+# Custom addition (fork): PDF time report
+reportlab==4.2.5
 # logging
 python-json-logger==4.0.0
 # html parser

@@ -16,6 +16,7 @@ from plane.space.views import (
     ProjectMembersEndpoint,
     ProjectMetaDataEndpoint,
     ProjectEstimatePublicEndpoint,
+    ProjectWorkLogReportPublicEndpoint,
 )
 
 urlpatterns = [
@@ -69,5 +70,11 @@ urlpatterns = [
         "anchor/<str:anchor>/estimates/",
         ProjectEstimatePublicEndpoint.as_view(),
         name="project-estimates-public",
+    ),
+    # Custom addition (fork): time report export of a published project
+    path(
+        "anchor/<str:anchor>/worklogs/",
+        ProjectWorkLogReportPublicEndpoint.as_view(),
+        name="project-worklogs-public",
     ),
 ]

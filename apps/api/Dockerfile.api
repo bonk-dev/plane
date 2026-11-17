@@ -11,12 +11,14 @@ RUN apk update && apk upgrade
 
 WORKDIR /code
 
+# Custom addition (fork): font-dejavu = Polish characters in the PDF time report
 RUN apk add --no-cache --upgrade \
     "libpq" \
     "libxslt" \
     "xmlsec" \
     "ca-certificates" \
-    "openssl"
+    "openssl" \
+    "font-dejavu"
 
 COPY requirements.txt ./
 COPY requirements ./requirements

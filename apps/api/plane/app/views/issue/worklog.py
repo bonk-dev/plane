@@ -4,18 +4,7 @@
 #
 # Custom addition (fork): time logged on work items.
 
-# Python imports
-import csv
-import io
-from collections import defaultdict
-
-# Django imports
-from django.db.models import Sum
-from django.http import HttpResponse
-from django.utils.http import content_disposition_header
-
 # Third Party imports
-from openpyxl import Workbook
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -23,8 +12,8 @@ from rest_framework.response import Response
 from .. import BaseAPIView, BaseViewSet
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.serializers import IssueWorkLogSerializer
-from plane.db.models import Issue, IssueAssignee, IssueWorkLog, Project
-from plane.utils.csv_utils import sanitize_csv_row
+from plane.db.models import Issue, IssueWorkLog, Project
+from plane.utils.time_report import EXPORT_FORMATS, build_time_report, time_report_export
 
 
 def issue_in_project(issue_id, slug, project_id):
@@ -98,22 +87,6 @@ class IssueWorkLogViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def _minutes_to_hours(minutes):
-    return round((minutes or 0) / 60, 2)
-
-
-def _estimate(point):
-    """Hours for time estimates (stored in minutes), otherwise the point/category value as-is."""
-    if point is None:
-        return None
-    if point.estimate.type == "time":
-        try:
-            return _minutes_to_hours(float(point.value))
-        except ValueError:
-            return point.value
-    return point.value
-
-
 class ProjectWorkLogEndpoint(BaseAPIView):
     """Project-wide time report: estimate vs. logged time per work item and per person.
 
@@ -121,6 +94,9 @@ class ProjectWorkLogEndpoint(BaseAPIView):
     GET ...?export=csv&group=issue  -> one row per work item (estimate vs. logged)
     GET ...?export=csv&group=member -> one row per person
     GET ...?export=csv&group=person -> one row per person and work item (estimate vs. their logged time)
+
+    XLSX files get a second "Podsumowanie" sheet (per person / module / cycle).
+    GET ...?export=pdf              -> PDF report: work items, summaries and estimate vs. logged charts
     """
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
@@ -129,140 +105,7 @@ class ProjectWorkLogEndpoint(BaseAPIView):
         if project is None:
             return Response({"error": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        worklogs = (
-            IssueWorkLog.objects.filter(workspace__slug=slug, project_id=project_id)
-            .select_related("issue", "issue__estimate_point__estimate", "created_by")
-            .order_by("logged_date", "created_at")
-        )
-
-        # Per work item: every issue that has an estimate or logged time
-        logged_by_issue = {
-            row["issue_id"]: row["total"]
-            for row in worklogs.values("issue_id").annotate(total=Sum("duration")).order_by()
-        }
-        issues = (
-            Issue.issue_objects.filter(workspace__slug=slug, project_id=project_id)
-            .select_related("estimate_point", "estimate_point__estimate")
-            .order_by("sequence_id")
-        )
-        issue_rows = []
-        for issue in issues:
-            estimate = issue.estimate_point
-            logged = logged_by_issue.get(issue.id, 0)
-            if estimate is None and not logged:
-                continue
-            issue_rows.append(
-                {
-                    "issue_id": str(issue.id),
-                    "identifier": f"{project.identifier}-{issue.sequence_id}",
-                    "name": issue.name,
-                    "estimate_value": estimate.value if estimate else None,
-                    "estimate_type": estimate.estimate.type if estimate else None,
-                    "logged_minutes": logged,
-                    "logged_hours": _minutes_to_hours(logged),
-                }
-            )
-
-        # Per person
-        member_rows = [
-            {
-                "user_id": str(row["created_by_id"]),
-                "display_name": row["created_by__display_name"],
-                "logged_minutes": row["total"],
-                "logged_hours": _minutes_to_hours(row["total"]),
-            }
-            for row in worklogs.values("created_by_id", "created_by__display_name")
-            .annotate(total=Sum("duration"))
-            .order_by("-total")
-        ]
-
-        # Per person and work item: the work item's estimate against the time that person logged on it.
-        # Estimated work items nobody logged time on yet are listed under their assignees.
-        person_minutes = defaultdict(int)
-        person_issues = {}
-        for w in worklogs:
-            key = (w.created_by.display_name if w.created_by else "", w.issue_id)
-            person_minutes[key] += w.duration
-            person_issues[key] = w.issue
-        estimated_without_logs = {
-            issue.id: issue for issue in issues if issue.estimate_point_id and issue.id not in logged_by_issue
-        }
-        assigned = defaultdict(list)
-        for row in IssueAssignee.objects.filter(issue_id__in=list(estimated_without_logs)).values(
-            "issue_id", "assignee__display_name"
-        ):
-            assigned[row["issue_id"]].append(row["assignee__display_name"])
-        for issue_id, issue in estimated_without_logs.items():
-            for display_name in assigned.get(issue_id) or [""]:
-                person_issues[(display_name, issue_id)] = issue
-        person_rows = [
-            {
-                "display_name": display_name,
-                "identifier": f"{project.identifier}-{issue.sequence_id}",
-                "name": issue.name,
-                "estimate": _estimate(issue.estimate_point),
-                "logged_hours": _minutes_to_hours(person_minutes[(display_name, issue_id)]),
-            }
-            for (display_name, issue_id), issue in sorted(
-                person_issues.items(), key=lambda item: (item[0][0].lower(), item[1].sequence_id)
-            )
-        ]
-
-        entry_rows = [
-            {
-                "id": str(w.id),
-                "logged_date": w.logged_date.isoformat(),
-                "identifier": f"{project.identifier}-{w.issue.sequence_id}",
-                "issue_name": w.issue.name,
-                "display_name": w.created_by.display_name if w.created_by else "",
-                "duration_minutes": w.duration,
-                "duration_hours": _minutes_to_hours(w.duration),
-                "description": w.description,
-            }
-            for w in worklogs
-        ]
-
         export = request.GET.get("export")
-        if export in ("csv", "xlsx"):
-            group = request.GET.get("group")
-            rows = {"issue": issue_rows, "member": member_rows, "person": person_rows}.get(group, entry_rows)
-            filename = f"{project.identifier}-worklogs{'-' + group if group in ('issue', 'member', 'person') else ''}"
-            fieldnames = list(rows[0].keys()) if rows else []
-            if export == "xlsx":
-                workbook = Workbook()
-                sheet = workbook.active
-                sheet.title = "Worklogs"
-                sheet.append(fieldnames)
-                for row in rows:
-                    sheet.append(sanitize_csv_row(row.values()))
-                buffer = io.BytesIO()
-                workbook.save(buffer)
-                response = HttpResponse(
-                    buffer.getvalue(),
-                    content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
-            else:
-                buffer = io.StringIO()
-                # BOM so that Excel opens Polish characters correctly
-                buffer.write("\ufeff")
-                if rows:
-                    writer = csv.writer(buffer, delimiter=";")
-                    writer.writerow(fieldnames)
-                    writer.writerows(sanitize_csv_row(row.values()) for row in rows)
-                response = HttpResponse(buffer.getvalue(), content_type="text/csv; charset=utf-8")
-            # filename*= keeps non-ASCII project identifiers (e.g. "INŻYN") intact
-            response["Content-Disposition"] = content_disposition_header(True, f"{filename}.{export}")
-            return response
-
-        total = sum(row["logged_minutes"] for row in member_rows)
-        return Response(
-            {
-                "total_minutes": total,
-                "total_hours": _minutes_to_hours(total),
-                "issues": issue_rows,
-                "members": member_rows,
-                "people": person_rows,
-                "entries": entry_rows,
-            },
-            status=status.HTTP_200_OK,
-        )
+        if export in EXPORT_FORMATS:
+            return time_report_export(project, export, request.GET.get("group"))
+        return Response(build_time_report(project), status=status.HTTP_200_OK)

@@ -32,5 +32,5 @@ from .asset import EntityAssetEndpoint, AssetRestoreEndpoint, EntityBulkAssetEnd
 
 from .meta import ProjectMetaDataEndpoint
 
-from .worklog import IssueWorkLogPublicEndpoint
+from .worklog import IssueWorkLogPublicEndpoint, ProjectWorkLogReportPublicEndpoint
 from .estimate import ProjectEstimatePublicEndpoint

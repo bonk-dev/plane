@@ -11,7 +11,8 @@ from rest_framework.response import Response
 
 # Module imports
 from .base import BaseAPIView
-from plane.db.models import DeployBoard, Issue, IssueWorkLog
+from plane.db.models import DeployBoard, Issue, IssueWorkLog, Project
+from plane.utils.time_report import EXPORT_FORMATS, time_report_export
 
 
 class IssueWorkLogPublicEndpoint(BaseAPIView):
@@ -49,3 +50,31 @@ class IssueWorkLogPublicEndpoint(BaseAPIView):
             ],
             status=status.HTTP_200_OK,
         )
+
+
+class ProjectWorkLogReportPublicEndpoint(BaseAPIView):
+    """Time report file of a published project (same as the project view, no user ids or entries).
+
+    GET ...?export=xlsx&group=person (default) | group=issue, export=csv for a CSV file, export=pdf for the PDF report
+    """
+
+    permission_classes = [AllowAny]
+    PUBLIC_GROUPS = ("person", "issue")
+
+    def get(self, request, anchor):
+        deploy_board = DeployBoard.objects.filter(anchor=anchor, entity_name="project").first()
+        if not deploy_board:
+            return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
+        project = Project.objects.filter(
+            pk=deploy_board.entity_identifier, workspace_id=deploy_board.workspace_id
+        ).first()
+        if project is None:
+            return Response({"error": "Project is not published"}, status=status.HTTP_404_NOT_FOUND)
+
+        export = request.GET.get("export", "xlsx")
+        if export not in EXPORT_FORMATS:
+            return Response({"error": "export must be csv, xlsx or pdf"}, status=status.HTTP_400_BAD_REQUEST)
+        group = request.GET.get("group")
+        if group not in self.PUBLIC_GROUPS:
+            group = "person"
+        return time_report_export(project, export, group)

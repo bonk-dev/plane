@@ -5,6 +5,7 @@
 # Custom addition (fork): time logged on work items.
 
 import io
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -21,6 +22,7 @@ from plane.db.models import (
     IssueWorkLog,
     Project,
     ProjectMember,
+    State,
     User,
     Workspace,
     WorkspaceMember,
@@ -207,7 +209,10 @@ class TestIssueWorkLog:
         ]
 
         body = member.get(report_url(setup) + "?export=csv&group=person").content.decode("utf-8-sig")
-        assert body.splitlines()[0] == "display_name;identifier;name;estimate;logged_hours"
+        assert body.splitlines()[0] == (
+            "display_name;identifier;name;estimate;logged_hours;difference_h;issue_logged_hours;state;state_group;"
+            "created_at;start_date;target_date;completed_at;delay_days"
+        )
 
     def test_report_xlsx(self, setup):
         _client(setup["member"]).post(issue_url(setup), {"duration": 90, "description": "=1+1"}, format="json")
@@ -216,11 +221,13 @@ class TestIssueWorkLog:
         assert resp.status_code == status.HTTP_200_OK
         assert resp["Content-Disposition"] == 'attachment; filename="PRJ-worklogs-person.xlsx"'
         sheet = load_workbook(io.BytesIO(resp.content)).active
-        assert [c.value for c in sheet[2]] == [
+        assert [c.value for c in sheet[2]][:7] == [
             "member",
             f"PRJ-{setup['issue'].sequence_id}",
             "Formularz logowania",
             2,
+            1.5,
+            -0.5,
             1.5,
         ]
 
@@ -229,6 +236,131 @@ class TestIssueWorkLog:
             io.BytesIO(_client(setup["member"]).get(report_url(setup) + "?export=xlsx").content)
         ).active
         assert sheet[2][-1].value == "'=1+1"
+
+    def _report_fixture(self, s):
+        """Formularz logowania: estimate 2h, done 3 days late.
+        Raport: no estimate, in progress, no dates."""
+        project, ws = s["project"], s["ws"]
+        Project.objects.filter(pk=project.id).update(timezone="Europe/Warsaw")
+        started = State.objects.create(name="W toku", group="started", color="#f00", project=project, workspace=ws)
+        done = State.objects.create(name="Zrobione", group="completed", color="#0f0", project=project, workspace=ws)
+        issue = s["issue"]
+        issue.state = done
+        issue.start_date = date(2026, 1, 5)
+        issue.target_date = date(2026, 1, 10)
+        issue.save()
+        # 23:30 UTC on the 12th is already the 13th in Warsaw
+        Issue.objects.filter(pk=issue.id).update(completed_at=datetime(2026, 1, 12, 23, 30, tzinfo=timezone.utc))
+        report = Issue.objects.create(name="Raport", project=project, workspace=ws, state=started)
+
+        member = _client(s["member"])
+        member.post(issue_url(s), {"duration": 180}, format="json")
+        member.post(issue_url(s, issue=report), {"duration": 30}, format="json")
+        _client(s["admin"]).post(issue_url(s), {"duration": 60}, format="json")
+        return issue, report
+
+    def test_report_state_and_dates(self, setup):
+        issue, report = self._report_fixture(setup)
+
+        resp = _client(setup["guest"]).get(report_url(setup))
+        assert resp.status_code == status.HTTP_200_OK
+        rows = {(p["display_name"], p["name"]): p for p in resp.data["people"]}
+        assert list(rows) == [("admin", "Formularz logowania"), ("member", "Formularz logowania"), ("member", "Raport")]
+
+        done = rows[("member", "Formularz logowania")]
+        assert done["estimate"] == 2.0
+        assert done["logged_hours"] == 3.0
+        assert done["difference_h"] == 1.0
+        assert done["issue_logged_hours"] == 4.0
+        assert (done["state"], done["state_group"]) == ("Zrobione", "completed")
+        assert done["start_date"] == date(2026, 1, 5)
+        assert done["target_date"] == date(2026, 1, 10)
+        assert done["completed_at"] == datetime(2026, 1, 13, 0, 30)
+        assert done["delay_days"] == 3
+        assert rows[("admin", "Formularz logowania")]["difference_h"] == -1.0
+
+        # missing values stay empty, not zero
+        open_row = rows[("member", "Raport")]
+        assert open_row["estimate"] is None
+        assert open_row["difference_h"] is None
+        assert (open_row["state"], open_row["state_group"]) == ("W toku", "started")
+        assert "cycle" not in open_row and "module" not in open_row
+        for key in ("start_date", "target_date", "completed_at", "delay_days"):
+            assert open_row[key] is None, key
+        assert open_row["created_at"] is not None
+
+        [issue_row] = [r for r in resp.data["issues"] if r["name"] == "Formularz logowania"]
+        assert issue_row["difference_h"] == 2.0
+        assert issue_row["delay_days"] == 3
+
+    def test_report_summary(self, setup):
+        self._report_fixture(setup)
+
+        summary = _client(setup["member"]).get(report_url(setup)).data["summary"]
+        assert summary["people"] == [
+            {"display_name": "admin", "estimate_h": 2.0, "logged_h": 1.0, "issues": 1, "closed_issues": 1},
+            {"display_name": "member", "estimate_h": 2.0, "logged_h": 3.5, "issues": 2, "closed_issues": 1},
+        ]
+        # whole project: every work item once, however many people worked on it
+        assert summary["total"] == {
+            "name": "total",
+            "estimate_h": 2.0,
+            "logged_h": 4.5,
+            "issues": 2,
+            "closed_issues": 1,
+        }
+        assert set(summary) == {"people", "total"}
+
+    def test_report_xlsx_columns_and_summary_sheet(self, setup):
+        self._report_fixture(setup)
+
+        resp = _client(setup["member"]).get(report_url(setup) + "?export=xlsx&group=person")
+        workbook = load_workbook(io.BytesIO(resp.content))
+        assert workbook.sheetnames == ["Worklogs", "Podsumowanie"]
+        sheet = workbook["Worklogs"]
+        header = [c.value for c in sheet[1]]
+        done = dict(zip(header, [c.value for c in sheet[3]]))
+        assert done["display_name"] == "member" and done["name"] == "Formularz logowania"
+        # real Excel dates, not text
+        assert done["target_date"] == datetime(2026, 1, 10)
+        assert done["completed_at"] == datetime(2026, 1, 13, 0, 30)
+        assert done["delay_days"] == 3
+        open_row = dict(zip(header, [c.value for c in sheet[4]]))
+        assert open_row["name"] == "Raport"
+        assert open_row["estimate"] is None and open_row["difference_h"] is None and open_row["delay_days"] is None
+
+        summary = [list(row) for row in workbook["Podsumowanie"].iter_rows(values_only=True)]
+        assert summary == [
+            ["Per osoba", None, None, None, None],
+            ["display_name", "estimate_h", "logged_h", "issues", "closed_issues"],
+            ["admin", 2, 1, 1, 1],
+            ["member", 2, 3.5, 2, 1],
+        ]
+
+    def test_report_pdf(self, setup):
+        self._report_fixture(setup)
+
+        resp = _client(setup["member"]).get(report_url(setup) + "?export=pdf")
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp["Content-Type"] == "application/pdf"
+        assert resp["Content-Disposition"] == 'attachment; filename="PRJ-raport-czasu.pdf"'
+        assert resp.content.startswith(b"%PDF")
+        # Polish characters need the embedded DejaVu font (font-dejavu in the Docker image)
+        assert b"DejaVuSans" in resp.content
+
+    def test_report_pdf_without_logged_time(self, setup):
+        resp = _client(setup["guest"]).get(report_url(setup) + "?export=pdf")
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp.content.startswith(b"%PDF")
+        assert _client(setup["outsider"]).get(report_url(setup) + "?export=pdf").status_code == 403
+
+    def test_report_includes_archived_work_items(self, setup):
+        _client(setup["member"]).post(issue_url(setup), {"duration": 60}, format="json")
+        Issue.objects.filter(pk=setup["issue"].id).update(archived_at=datetime(2026, 2, 1, tzinfo=timezone.utc))
+
+        resp = _client(setup["member"]).get(report_url(setup))
+        assert [p["name"] for p in resp.data["people"]] == ["Formularz logowania"]
+        assert resp.data["summary"]["people"][0]["logged_h"] == 1.0
 
 
 @pytest.mark.contract
@@ -264,6 +396,46 @@ class TestIssueWorkLogPublic:
     def test_unpublished_project_is_404(self, setup):
         resp = APIClient().get(self._url("not-a-real-anchor", setup["issue"]))
         assert resp.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_anonymous_downloads_time_report(self, setup):
+        board = self._publish(setup)
+        _client(setup["member"]).post(issue_url(setup), {"duration": 90, "description": "a"}, format="json")
+
+        resp = APIClient().get(f"/api/public/anchor/{board.anchor}/worklogs/")
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp["Content-Disposition"] == 'attachment; filename="PRJ-worklogs-person.xlsx"'
+        workbook = load_workbook(io.BytesIO(resp.content))
+        assert workbook.sheetnames == ["Worklogs", "Podsumowanie"]
+        assert [c.value for c in workbook["Worklogs"][2]][:5] == [
+            "member",
+            f"PRJ-{setup['issue'].sequence_id}",
+            "Formularz logowania",
+            2,
+            1.5,
+        ]
+
+        # only the person / work item views; user ids (group=member) and raw entries are not public
+        resp = APIClient().get(f"/api/public/anchor/{board.anchor}/worklogs/?export=csv&group=member")
+        assert resp["Content-Disposition"] == 'attachment; filename="PRJ-worklogs-person.csv"'
+        assert "user_id" not in resp.content.decode("utf-8-sig")
+        resp = APIClient().get(f"/api/public/anchor/{board.anchor}/worklogs/?export=csv&group=issue")
+        assert resp.content.decode("utf-8-sig").startswith("issue_id;identifier")
+
+    def test_time_report_of_unpublished_project_is_404(self, setup):
+        assert APIClient().get("/api/public/anchor/not-a-real-anchor/worklogs/").status_code == 404
+        board = self._publish(setup)
+        resp = APIClient().get(f"/api/public/anchor/{board.anchor}/worklogs/?export=docx")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_anonymous_downloads_pdf_report(self, setup):
+        board = self._publish(setup)
+        _client(setup["member"]).post(issue_url(setup), {"duration": 90}, format="json")
+
+        resp = APIClient().get(f"/api/public/anchor/{board.anchor}/worklogs/?export=pdf")
+        assert resp.status_code == status.HTTP_200_OK
+        assert resp["Content-Type"] == "application/pdf"
+        assert resp["Content-Disposition"] == 'attachment; filename="PRJ-raport-czasu.pdf"'
+        assert resp.content.startswith(b"%PDF")
 
     def test_public_endpoint_is_read_only(self, setup):
         board = self._publish(setup)
