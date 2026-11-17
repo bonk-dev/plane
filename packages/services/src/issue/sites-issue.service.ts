@@ -293,4 +293,14 @@ export class SitesIssueService extends APIService {
         throw error?.response;
       });
   }
+
+  /**
+   * Custom addition (fork): direct link to the time report file of a published project
+   * (estimate vs. logged time per person and work item, plus a summary sheet)
+   * @param {string} anchor - The anchor identifier
+   * @param {"xlsx" | "csv" | "pdf"} format - File format (pdf: report with summary tables and charts)
+   */
+  static workLogReportUrl(anchor: string, format: "xlsx" | "csv" | "pdf" = "xlsx"): string {
+    return `${API_BASE_URL}/api/public/anchor/${anchor}/worklogs/?export=${format}&group=person`;
+  }
 }

@@ -23,6 +23,7 @@ import type { TIssueLayout } from "@/types/issue";
 import { IssuesLayoutSelection } from "./layout-selection";
 import { NavbarTheme } from "./theme";
 import { UserAvatar } from "./user-avatar";
+import { NavbarWorkLogReport } from "./worklog-report";
 
 export type NavbarControlsProps = {
   publishSettings: PublishStore;
@@ -74,7 +75,7 @@ export const NavbarControls = observer(function NavbarControls(props: NavbarCont
         if (activeLayout === undefined || activeLayout !== currentBoard) {
           const { query, queryParam } = queryParamGenerator({ board: currentBoard, peekId, priority, state, labels });
           const params: any = {
-            display_filters: { layout: (query?.board as string[])[0] },
+            display_filters: { layout: (query?.board as string[] | undefined)?.[0] },
             filters: {
               priority: query?.priority ?? undefined,
               state: query?.state ?? undefined,
@@ -117,6 +118,11 @@ export const NavbarControls = observer(function NavbarControls(props: NavbarCont
       {/* issue filters */}
       <div className="shrink-0">
         <IssueFiltersDropdown anchor={anchor} />
+      </div>
+
+      {/* Custom addition (fork): time report export */}
+      <div className="shrink-0">
+        <NavbarWorkLogReport anchor={anchor} />
       </div>
 
       {/* theming */}
