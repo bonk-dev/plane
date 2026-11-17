@@ -14,11 +14,12 @@ import { CustomMenu } from "@plane/ui";
 import type { TWorkLogReportGroup } from "@/services/issue/issue_worklog.service";
 import { IssueWorkLogService } from "@/services/issue/issue_worklog.service";
 
-const REPORTS: { group?: TWorkLogReportGroup; label: string }[] = [
-  { group: "person", label: "Osoba – zadanie – estymata – czas" },
-  { group: "issue", label: "Zadania: estymata vs. czas" },
-  { group: "member", label: "Suma czasu per osoba" },
-  { label: "Wszystkie wpisy czasu" },
+const REPORTS: { group?: TWorkLogReportGroup; format: "xlsx" | "pdf"; label: string }[] = [
+  { group: "person", format: "xlsx", label: "Osoba – zadanie – estymata – czas" },
+  { group: "issue", format: "xlsx", label: "Zadania: estymata vs. czas" },
+  { group: "member", format: "xlsx", label: "Suma czasu per osoba" },
+  { format: "xlsx", label: "Wszystkie wpisy czasu" },
+  { format: "pdf", label: "Raport PDF z wykresami" },
 ];
 
 type Props = {
@@ -46,7 +47,12 @@ export function WorkLogReportMenu(props: Props) {
           key={report.label}
           onClick={() => {
             // Excel file: hours stay numbers regardless of the spreadsheet locale (CSV is available via ?export=csv)
-            window.location.href = IssueWorkLogService.reportExportUrl(workspaceSlug, projectId, "xlsx", report.group);
+            window.location.href = IssueWorkLogService.reportExportUrl(
+              workspaceSlug,
+              projectId,
+              report.format,
+              report.group
+            );
           }}
         >
           {report.label}

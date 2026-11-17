@@ -77,7 +77,7 @@ export class IssueWorkLogService extends APIService {
   static reportExportUrl(
     workspaceSlug: string,
     projectId: string,
-    format: "csv" | "xlsx",
+    format: "csv" | "xlsx" | "pdf",
     group?: TWorkLogReportGroup
   ) {
     const params = new URLSearchParams({ export: format });
